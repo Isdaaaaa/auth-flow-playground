@@ -1,45 +1,20 @@
-type Scenario = {
-  id: string
-  title: string
-  summary: string
-  severity: 'normal' | 'warning' | 'critical'
-}
+import { useMemo, useState } from 'react'
 
-const scenarios: Scenario[] = [
-  {
-    id: 'expired-refresh',
-    title: 'Expired refresh token',
-    summary: 'Access token expires and refresh attempt receives invalid_grant.',
-    severity: 'critical',
-  },
-  {
-    id: 'clock-skew',
-    title: 'Clock skew drift',
-    summary: 'Client clock is 90s ahead; server validates token as not-yet-valid.',
-    severity: 'warning',
-  },
-  {
-    id: 'multi-tab-logout',
-    title: 'Multi-tab logout',
-    summary: 'Logout in one tab invalidates cookie and cascades session reset.',
-    severity: 'normal',
-  },
-  {
-    id: 'stale-rotation',
-    title: 'Stale refresh rotation',
-    summary: 'Refresh token replay detected after rotation counter increments.',
-    severity: 'critical',
-  },
-]
+import { defaultScenarioId, scenarioCatalog } from './scenarios'
 
-const severityClass: Record<Scenario['severity'], string> = {
+const severityClass: Record<(typeof scenarioCatalog)[number]['severity'], string> = {
   normal: 'border-emeraldOk/40 text-emeraldOk',
   warning: 'border-amberWarn/40 text-amberWarn',
   critical: 'border-roseError/40 text-roseError',
 }
 
 export default function App() {
-  const activeScenario = scenarios[0]
+  const [activeScenarioId, setActiveScenarioId] = useState(defaultScenarioId)
+
+  const activeScenario = useMemo(
+    () => scenarioCatalog.find((scenario) => scenario.id === activeScenarioId) ?? scenarioCatalog[0],
+    [activeScenarioId],
+  )
 
   return (
     <main className="min-h-screen bg-slatebg text-offwhite">
@@ -50,21 +25,20 @@ export default function App() {
               <p className="text-xs font-medium uppercase tracking-[0.24em] text-blue-200/70">
                 Scenario Catalog
               </p>
-              <h1 className="text-2xl font-semibold leading-tight tracking-tight">
-                Auth Flow Playground
-              </h1>
+              <h1 className="text-2xl font-semibold leading-tight tracking-tight">Auth Flow Playground</h1>
               <p className="text-sm text-slate-300">
                 Pick a deterministic failure path and inspect each transition like a debugger trace.
               </p>
             </header>
 
             <ul className="space-y-2">
-              {scenarios.map((scenario, index) => {
+              {scenarioCatalog.map((scenario, index) => {
                 const isActive = scenario.id === activeScenario.id
                 return (
                   <li key={scenario.id}>
                     <button
                       type="button"
+                      onClick={() => setActiveScenarioId(scenario.id)}
                       className={`w-full rounded-xl border px-3 py-3 text-left transition ${
                         isActive
                           ? 'border-indigoTrust/80 bg-indigoTrust/15 shadow-panel'
@@ -80,7 +54,17 @@ export default function App() {
                         </span>
                       </div>
                       <p className="text-xs leading-relaxed text-slate-300">{scenario.summary}</p>
-                      <p className="mt-2 font-mono text-[11px] text-slate-400">Preset {index + 1}</p>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <p className="font-mono text-[11px] text-slate-400">Preset {index + 1}</p>
+                        {scenario.tags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-md border border-blueTrust/40 bg-blueTrust/10 px-1.5 py-[1px] text-[10px] uppercase tracking-wide text-blue-100"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     </button>
                   </li>
                 )
@@ -92,9 +76,7 @@ export default function App() {
         <section className="panel flex min-h-[420px] flex-1 flex-col">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-blue-200/70">
-                Flow Visualizer
-              </p>
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-blue-200/70">Flow Visualizer</p>
               <h2 className="mt-1 text-lg font-semibold">{activeScenario.title}</h2>
             </div>
             <div className="flex gap-2">
@@ -116,22 +98,12 @@ export default function App() {
               <div className="rounded-full border border-blueTrust/45 bg-blueTrust/15 px-4 py-1 text-xs font-medium text-blue-100">
                 Timeline not running yet
               </div>
-              <h3 className="max-w-lg text-xl font-semibold tracking-tight text-offwhite">
-                Waiting for first transition event
-              </h3>
+              <h3 className="max-w-lg text-xl font-semibold tracking-tight text-offwhite">Waiting for first transition event</h3>
               <p className="max-w-xl text-sm leading-relaxed text-slate-300">
-                Trigger <span className="font-mono text-blue-200">Start scenario</span> to render state
-                nodes, transition arcs, and token rotation markers. Slice-000 ships the shell and
-                design system; state engine wiring begins in the next slice.
+                Selected scenario has <span className="font-mono text-blue-200">{activeScenario.fixture.events.length}</span>{' '}
+                seeded events and <span className="font-mono text-blue-200">{activeScenario.fixture.tabsActive}</span> active tab
+                {activeScenario.fixture.tabsActive > 1 ? 's' : ''}. State-machine wiring lands in the next slice.
               </p>
-              <div className="w-full max-w-md rounded-xl border border-slate-500/40 bg-slatebg/60 p-3 text-left">
-                <p className="mb-2 text-xs uppercase tracking-[0.2em] text-slate-400">Loading shape</p>
-                <div className="space-y-2">
-                  <div className="h-2 animate-pulse rounded bg-slateelev/80" />
-                  <div className="h-2 w-10/12 animate-pulse rounded bg-slateelev/70" />
-                  <div className="h-2 w-8/12 animate-pulse rounded bg-slateelev/60" />
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -139,36 +111,42 @@ export default function App() {
         <aside className="lg:w-[320px] lg:flex-none">
           <section className="panel flex h-full flex-col gap-4">
             <header>
-              <p className="text-xs font-medium uppercase tracking-[0.24em] text-blue-200/70">
-                Inspector
-              </p>
+              <p className="text-xs font-medium uppercase tracking-[0.24em] text-blue-200/70">Inspector</p>
               <h2 className="mt-1 text-lg font-semibold">Token + Cookie Snapshot</h2>
             </header>
 
             <article className="rounded-xl border border-slate-600/70 bg-slatepanel/60 p-4">
               <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-400">Access Token</p>
               <ul className="space-y-2 text-sm text-slate-200">
-                <li className="flex justify-between gap-2"><span>Issued at</span><span className="font-mono text-slate-300">--:--:--</span></li>
-                <li className="flex justify-between gap-2"><span>Expires in</span><span className="font-mono text-amberWarn">pending</span></li>
-                <li className="flex justify-between gap-2"><span>Rotation</span><span className="font-mono text-slate-300">#0</span></li>
+                <li className="flex justify-between gap-2">
+                  <span>Issued at</span>
+                  <span className="font-mono text-slate-300">{activeScenario.fixture.tokens.issuedAt.slice(11, 19)}</span>
+                </li>
+                <li className="flex justify-between gap-2">
+                  <span>Expires at</span>
+                  <span className="font-mono text-amberWarn">{activeScenario.fixture.tokens.expiresAt.slice(11, 19)}</span>
+                </li>
+                <li className="flex justify-between gap-2">
+                  <span>Rotation</span>
+                  <span className="font-mono text-slate-300">#{activeScenario.fixture.tokens.rotation}</span>
+                </li>
               </ul>
             </article>
 
             <article className="rounded-xl border border-slate-600/70 bg-slatepanel/60 p-4">
               <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-400">Cookie Flags</p>
               <div className="flex flex-wrap gap-2">
-                <span className="chip">HttpOnly</span>
-                <span className="chip">SameSite=Lax</span>
-                <span className="chip">Secure</span>
+                {activeScenario.fixture.cookies.map((cookie) => (
+                  <span className="chip" key={cookie.name}>
+                    {cookie.name}:{cookie.sameSite}
+                  </span>
+                ))}
               </div>
             </article>
 
             <article className="rounded-xl border border-amberWarn/35 bg-amberWarn/10 p-4">
               <p className="mb-1 text-xs uppercase tracking-[0.18em] text-amberWarn">Debugger Note</p>
-              <p className="text-sm leading-relaxed text-amber-100/90">
-                No transition selected yet. As events stream in, this panel will explain why the
-                machine moved, including clock-skew and stale-token diagnostics.
-              </p>
+              <p className="text-sm leading-relaxed text-amber-100/90">{activeScenario.fixture.events.at(-1)?.detail}</p>
             </article>
           </section>
         </aside>
