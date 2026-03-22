@@ -1,63 +1,61 @@
 # Auth Flow Playground
 
-Interactive sandbox for rehearsing tricky authentication lifecycle scenarios (expired refresh, clock skew, multi-tab logout) with a debugger-style UI.
+Auth Flow Playground is an interactive sandbox for developers to rehearse and debug authentication flows and edge cases without wiring a real Identity Provider (IdP). It visualizes state transitions, tokens, and cookies so you can step through scenarios like expired refresh tokens, clock skew, multi-tab logout, and failed callbacks.
 
-## Slice-004 status: token + cookie inspector
+Core features
 
-This slice upgrades the right-side inspector into a true per-step auth debugger:
+- Curated scenario catalog (expired refresh, invalid callback, clock skew, multi-tab logout, stale refresh)
+- Mock API layer with deterministic responses and latency controls (MSW)
+- XState-driven auth state machines for login, refresh, and logout with observable transitions
+- Flow visualizer (play/pause/step) showing timeline and state graph
+- Token & cookie inspector showing expiry, rotations, and cookie flags per step
+- Explanation panel that summarizes why each state transition occurred
 
-- Per-step token inspection in `src/App.tsx`:
-  - masked access + refresh token values
-  - issued/expiry time visibility
-  - derived token state badge (`active`, `expired`, `revoked`, `pending`)
-- Rotation ledger in the inspector:
-  - current rotation counter
-  - refresh success count
-  - refresh rejection count
-- Cookie flag inspector with event-aware status:
-  - SameSite, HttpOnly, Secure flags
-  - per-step `active`/`cleared` status as timeline events are applied
-- Extended UI tests in `src/App.test.tsx` that validate inspector rendering and step-driven updates.
+Why it matters
 
-## Getting started
+Authentication bugs are often subtle and hard to reproduce. This project provides a deterministic, visual debugger for auth flows so engineers and platform teams can reproduce, explain, and teach complex edge cases quickly. It's ideal for demos, debugging sessions, and onboarding engineers to common identity pitfalls.
 
-### 1) Install dependencies
+Quickstart (development)
 
-```bash
-npm install
-```
+1. Install dependencies
 
-### 2) Run locally
+   npm install
 
-```bash
-npm run dev
-```
+2. Start development server
 
-Then open the printed local URL (usually `http://localhost:5173`).
+   npm run dev
 
-## Scripts
+3. Open http://localhost:5173 and choose a scenario from the catalog. Use the stepper and timeline to observe state transitions and inspect tokens/cookies.
 
-- `npm run dev` - Start Vite dev server
-- `npm run build` - TypeScript build + production bundle
-- `npm run preview` - Preview built app locally
-- `npm run typecheck` - Strict TS type checks (`tsc --noEmit`)
-- `npm run lint` - ESLint checks with zero warnings allowed
-- `npm run format` - Prettier write pass
-- `npm run format:check` - Prettier check mode
-- `npm run test` - Run deterministic scenario tests via Vitest
+Notes on implementation
 
-## Architecture notes (slice-004)
+- Built with React + Vite + TypeScript + Tailwind
+- XState models the auth flows and emits structured transition events consumed by the visualizer
+- MSW provides a seeded mock API layer for deterministic scenario playback
+- Small utilities compute token expiry visuals and clock-skew demonstrations
+- Demo mode scripts produce short, GIF-friendly recordings of failing flows
 
-- `src/scenarios/types.ts`: shared types for scenarios, fixtures, and API responses
-- `src/scenarios/catalog.ts`: scenario presets + fixture datasets
-- `src/scenarios/mockApi.ts`: deterministic mock auth API functions
-- `src/scenarios/*.test.ts`: catalog and API behavior tests
-- `src/App.tsx`: three-panel debugger UI + per-step token/cookie inspector logic
+Limitations
 
-## Extending scenarios
+- No real OAuth/OpenID integration (intentionally mocked for deterministic behavior)
+- No user accounts or persistence; this is a developer sandbox
+- Not production-ready as an identity provider or SDK
 
-1. Add a new `ScenarioPreset` object in `src/scenarios/catalog.ts`.
-2. Include complete fixture data (`user`, `tokens`, `cookies`, `events`, `apiErrors`).
-3. Use a unique `id` and ensure deterministic values (avoid `Date.now()` / random values).
-4. If needed, update branches in `src/scenarios/mockApi.ts` for scenario-specific behavior.
-5. Add or update tests in `src/scenarios/scenarios.test.ts`.
+Showcase notes
+
+- Recording a 60s demo that shows a refresh token expiry mid-session produces a concise clip that demonstrates both the problem and recommended mitigation (graceful logout + user-facing refresh error guidance).
+- The UI is optimized for screenshot and GIF capture: strong default colors, legible typography, and compact panels.
+
+Monetization assessment
+
+- Target users (developer teams, platform/identity teams, DevRel) can plausibly pay for a hosted, branded version, workshop content, or specialized training materials.
+- A freemium model (open-source sandbox + paid hosted/demo workspace or enterprise-ready integrations) is feasible.
+
+Repository status
+
+Stage: dev_complete (finalization in progress)
+
+Contact / Maintainers
+
+- Maintainer: (add name/email/contact here)
+
