@@ -8,7 +8,7 @@
   {
     "id": "slice-001",
     "title": "Scenario catalog and fixtures",
-    "status": "in_progress",
+    "status": "done",
     "notes": "Define core auth scenarios, mock APIs, and seed data for flows."
   },
   {
