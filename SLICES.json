@@ -1,0 +1,38 @@
+[
+  {
+    "id": "slice-000",
+    "title": "Bootstrap repo and planning",
+    "status": "todo",
+    "notes": "Project skeleton, planning docs, base tooling."
+  },
+  {
+    "id": "slice-001",
+    "title": "Scenario catalog and fixtures",
+    "status": "todo",
+    "notes": "Define core auth scenarios, mock APIs, and seed data for flows."
+  },
+  {
+    "id": "slice-002",
+    "title": "Auth state machine core",
+    "status": "todo",
+    "notes": "Implement XState machines for login, refresh, logout, and error paths with mocked transitions."
+  },
+  {
+    "id": "slice-003",
+    "title": "Flow visualizer UI",
+    "status": "todo",
+    "notes": "Timeline/graph view of state transitions with step controls."
+  },
+  {
+    "id": "slice-004",
+    "title": "Token & cookie inspector",
+    "status": "todo",
+    "notes": "Panel showing access/refresh tokens, expiry, rotations, and cookie flags per step."
+  },
+  {
+    "id": "slice-005",
+    "title": "Edge case lab",
+    "status": "todo",
+    "notes": "Preset scenarios: clock skew, multi-tab logout, failed callback, stale refresh token."
+  }
+]
