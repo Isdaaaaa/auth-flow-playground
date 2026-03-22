@@ -20,7 +20,7 @@
   {
     "id": "slice-003",
     "title": "Flow visualizer UI",
-    "status": "todo",
+    "status": "in_progress",
     "notes": "Timeline/graph view of state transitions with step controls."
   },
   {
