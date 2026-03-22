@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  font-family: 'Inter', system-ui, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #0f172a;
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-slate-600/70 bg-slatepanel/70 p-4 shadow-panel backdrop-blur-sm sm:p-5;
+  }
+
+  .control-btn {
+    @apply rounded-lg border border-slate-500/80 bg-slatebg/70 px-3 py-1.5 text-xs font-medium text-slate-100 transition hover:border-blueTrust/55 hover:bg-slatebg;
+  }
+
+  .control-btn--primary {
+    @apply border-transparent bg-trust text-white hover:opacity-95;
+  }
+
+  .chip {
+    @apply rounded-md border border-slate-500/70 bg-slatebg/70 px-2 py-1 font-mono text-xs text-slate-200;
+  }
+}
