@@ -32,7 +32,7 @@
   {
     "id": "slice-005",
     "title": "Edge case lab",
-    "status": "todo",
+    "status": "in_progress",
     "notes": "Preset scenarios: clock skew, multi-tab logout, failed callback, stale refresh token."
   }
 ]

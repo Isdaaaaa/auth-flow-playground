@@ -98,6 +98,58 @@ const maskToken = (token: string) => {
 
 const formatIsoTime = (value: string) => value.slice(11, 19)
 
+const eventImpactRank: Record<AuthEventType, number> = {
+  token_issued: 0,
+  refresh_succeeded: 1,
+  token_expired: 2,
+  broadcast_logout: 2,
+  cookie_cleared: 2,
+  callback_failed: 3,
+  clock_skew_detected: 3,
+  csrf_failed: 4,
+  refresh_rejected: 4,
+  session_revoked: 4,
+}
+
+const eventRiskLabel: Record<AuthEventType, string> = {
+  token_issued: 'Low risk · baseline auth state',
+  refresh_succeeded: 'Low risk · refresh path healthy',
+  token_expired: 'Medium risk · access interruption likely',
+  broadcast_logout: 'Medium risk · shared-session disruption',
+  cookie_cleared: 'Medium risk · local session invalidated',
+  callback_failed: 'High risk · callback integrity failed',
+  clock_skew_detected: 'High risk · token validation drift',
+  csrf_failed: 'Critical risk · CSRF guard triggered',
+  refresh_rejected: 'Critical risk · refresh grant denied',
+  session_revoked: 'Critical risk · server trust revoked',
+}
+
+const eventRootCause: Record<AuthEventType, string> = {
+  token_issued: 'Fresh tokens were minted after auth initiation.',
+  refresh_succeeded: 'Refresh token accepted and rotated successfully.',
+  token_expired: 'Access token TTL elapsed before refresh completed.',
+  broadcast_logout: 'Another tab emitted a logout event through BroadcastChannel/storage.',
+  cookie_cleared: 'Session cookie invalidated locally as part of logout or revocation handling.',
+  callback_failed: 'OAuth state/PKCE validation mismatch indicates callback tampering or stale state.',
+  clock_skew_detected: 'Client/server clocks diverged enough to violate token nbf/exp assumptions.',
+  csrf_failed: 'State/CSRF checks failed and session was force-reset defensively.',
+  refresh_rejected: 'Refresh token is expired, revoked, or replayed and rejected by IdP.',
+  session_revoked: 'Server-side policy/admin action invalidated the active session.',
+}
+
+const eventNextAction: Record<AuthEventType, string> = {
+  token_issued: 'Continue stepping to validate expiry and recovery behavior.',
+  refresh_succeeded: 'Verify rotation counter increments and stale token rejection rules.',
+  token_expired: 'Trigger refresh immediately and inspect refresh API response payload.',
+  broadcast_logout: 'Confirm all tabs clear memory + cookies and redirect to login.',
+  cookie_cleared: 'Confirm cookie flags and trigger explicit re-authentication UX.',
+  callback_failed: 'Restart login with a fresh state nonce and validate callback origin.',
+  clock_skew_detected: 'Apply clock sync/leeway and re-test with server-issued timestamps.',
+  csrf_failed: 'Invalidate local auth context, rotate state secret, and require full login.',
+  refresh_rejected: 'Force sign-in, revoke token family, and audit for replay indicators.',
+  session_revoked: 'Purge local tokens/cookies, show re-auth prompt, and log revocation reason.',
+}
+
 export default function App() {
   const [activeScenarioId, setActiveScenarioId] = useState(defaultScenarioId)
   const [snapshot, setSnapshot] = useState<SnapshotFrom<ReturnType<typeof createAuthMachine>> | null>(null)
@@ -215,7 +267,7 @@ export default function App() {
     }
   }, [isPlaying, timelineCursor, timelineEvents.length])
 
-  const activeEvent = timelineEvents[Math.max(timelineCursor - 1, 0)]
+  const activeEvent = timelineCursor > 0 ? timelineEvents[timelineCursor - 1] : undefined
   const processedEvents = timelineEvents.slice(0, timelineCursor)
   const refreshSuccesses = processedEvents.filter((event) => event.type === 'refresh_succeeded').length
   const refreshFailures = processedEvents.filter((event) => event.type === 'refresh_rejected').length
@@ -224,6 +276,17 @@ export default function App() {
     ['cookie_cleared', 'session_revoked', 'csrf_failed', 'broadcast_logout'].includes(event.type),
   )
   const cookieClearedSeen = processedEvents.some((event) => ['cookie_cleared', 'broadcast_logout'].includes(event.type))
+  const latestSignal = [...processedEvents].sort((a, b) => eventImpactRank[b.type] - eventImpactRank[a.type])[0]
+  const fixtureRefreshError = activeScenario.fixture.apiErrors.refresh
+  const fixtureCallbackError = activeScenario.fixture.apiErrors.callback
+  const fixtureSessionError = activeScenario.fixture.apiErrors.session
+  const fallbackRootCause =
+    fixtureRefreshError?.message ?? fixtureCallbackError?.message ?? fixtureSessionError?.message ?? 'No explicit API error fixture for this scenario.'
+  const edgeCaseRisk = latestSignal ? eventRiskLabel[latestSignal.type] : `Pending risk signal · ${activeScenario.severity} scenario`
+  const edgeCaseRootCause = latestSignal ? eventRootCause[latestSignal.type] : fallbackRootCause
+  const edgeCaseNextAction = latestSignal
+    ? eventNextAction[latestSignal.type]
+    : 'Press Play or Step to inspect the first event and derive a concrete remediation path.'
   const stepTimestamp = activeEvent?.at ?? activeScenario.fixture.tokens.issuedAt
   const effectiveToken = snapshot?.context.token
   const accessTokenValue = effectiveToken?.accessToken ?? activeScenario.fixture.tokens.accessToken
@@ -402,8 +465,11 @@ export default function App() {
             <section className="relative rounded-xl border border-slate-500/65 bg-slatebg/45 p-4">
               <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-blue-100">Scenario Timeline</h3>
               {timelineEvents.length === 0 ? (
-                <div className="flex h-[220px] items-center justify-center rounded-lg border border-dashed border-slate-500/70 bg-slatepanel/30 p-4 text-center text-sm text-slate-300">
-                  No seeded timeline events yet. Pick another scenario or inject edge events to continue debugging.
+                <div className="flex h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-blueTrust/45 bg-blueTrust/10 p-5 text-center">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">Timeline empty</p>
+                  <p className="max-w-[34ch] text-sm leading-relaxed text-slate-200">
+                    No seeded events for this preset. Inject an edge event or switch scenarios to start tracing state transitions.
+                  </p>
                 </div>
               ) : (
                 <ol className="space-y-2 overflow-auto pr-1" aria-label="scenario timeline">
@@ -436,8 +502,9 @@ export default function App() {
           </div>
 
           {!snapshot || snapshot.matches('booting') ? (
-            <div className="mt-3 rounded-lg border border-blueTrust/45 bg-blueTrust/10 px-3 py-2 text-xs text-blue-100">
-              Loading machine context… waiting for session bootstrap.
+            <div className="mt-3 rounded-lg border border-indigoTrust/50 bg-indigoTrust/12 px-3 py-2.5 text-xs text-blue-100 shadow-panel">
+              <p className="font-semibold uppercase tracking-[0.14em]">Bootstrapping auth machine</p>
+              <p className="mt-1 text-[11px] text-blue-100/90">Loading machine context and deterministic fixture state…</p>
             </div>
           ) : null}
         </section>
@@ -532,6 +599,21 @@ export default function App() {
             <article className="rounded-xl border border-amberWarn/35 bg-amberWarn/10 p-4">
               <p className="mb-1 text-xs uppercase tracking-[0.18em] text-amberWarn">Debugger Note</p>
               <p className="text-sm leading-relaxed text-amber-100/90">{activeEvent?.detail ?? 'Step the timeline to inspect transition metadata.'}</p>
+            </article>
+
+            <article className="rounded-xl border border-blueTrust/45 bg-blueTrust/12 p-4">
+              <p className="mb-2 text-xs uppercase tracking-[0.18em] text-blue-100">Edge Case Lab</p>
+              <div className="mb-3 rounded-lg border border-blueTrust/35 bg-slatebg/45 px-2.5 py-2 text-xs text-blue-100">
+                Risk profile: {edgeCaseRisk}
+              </div>
+              <div className="space-y-2 text-sm text-slate-100">
+                <p>
+                  <span className="text-slate-300">Likely root cause:</span> {edgeCaseRootCause}
+                </p>
+                <p>
+                  <span className="text-slate-300">Recommended next action:</span> {edgeCaseNextAction}
+                </p>
+              </div>
             </article>
 
             {snapshot?.context.error ? (
