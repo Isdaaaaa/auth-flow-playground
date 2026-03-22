@@ -84,6 +84,20 @@ const playIntervalMs = 1000
 
 type AuthMachineInstance = ReturnType<typeof createAuthMachine>
 
+const maskToken = (token: string) => {
+  if (!token) {
+    return '—'
+  }
+
+  if (token.length <= 10) {
+    return token
+  }
+
+  return `${token.slice(0, 6)}…${token.slice(-4)}`
+}
+
+const formatIsoTime = (value: string) => value.slice(11, 19)
+
 export default function App() {
   const [activeScenarioId, setActiveScenarioId] = useState(defaultScenarioId)
   const [snapshot, setSnapshot] = useState<SnapshotFrom<ReturnType<typeof createAuthMachine>> | null>(null)
@@ -202,6 +216,27 @@ export default function App() {
   }, [isPlaying, timelineCursor, timelineEvents.length])
 
   const activeEvent = timelineEvents[Math.max(timelineCursor - 1, 0)]
+  const processedEvents = timelineEvents.slice(0, timelineCursor)
+  const refreshSuccesses = processedEvents.filter((event) => event.type === 'refresh_succeeded').length
+  const refreshFailures = processedEvents.filter((event) => event.type === 'refresh_rejected').length
+  const tokenExpiredSeen = processedEvents.some((event) => event.type === 'token_expired')
+  const sessionRevokedSeen = processedEvents.some((event) =>
+    ['cookie_cleared', 'session_revoked', 'csrf_failed', 'broadcast_logout'].includes(event.type),
+  )
+  const cookieClearedSeen = processedEvents.some((event) => ['cookie_cleared', 'broadcast_logout'].includes(event.type))
+  const stepTimestamp = activeEvent?.at ?? activeScenario.fixture.tokens.issuedAt
+  const effectiveToken = snapshot?.context.token
+  const accessTokenValue = effectiveToken?.accessToken ?? activeScenario.fixture.tokens.accessToken
+  const refreshTokenValue = effectiveToken?.refreshToken ?? activeScenario.fixture.tokens.refreshToken
+  const tokenRotation = (effectiveToken?.rotation ?? activeScenario.fixture.tokens.rotation) + refreshSuccesses
+  const tokenValid = Boolean(effectiveToken?.valid) && !sessionRevokedSeen
+  const tokenStateLabel = sessionRevokedSeen
+    ? 'revoked'
+    : tokenExpiredSeen
+      ? 'expired'
+      : tokenValid
+        ? 'active'
+        : 'pending'
 
   return (
     <main className="min-h-screen bg-slatebg text-offwhite">
@@ -412,35 +447,86 @@ export default function App() {
             <header>
               <p className="text-xs font-medium uppercase tracking-[0.24em] text-blue-200/70">Inspector</p>
               <h2 className="mt-1 text-lg font-semibold">Token + Cookie Snapshot</h2>
+              <p className="mt-2 text-xs text-slate-300">
+                Step timestamp <span className="font-mono text-blue-100">{formatIsoTime(stepTimestamp)}</span>
+              </p>
             </header>
 
-            <article className="rounded-xl border border-slate-600/70 bg-slatepanel/60 p-4">
-              <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-400">Access Token</p>
+            <article className="rounded-xl border border-indigoTrust/45 bg-indigoTrust/10 p-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs uppercase tracking-[0.18em] text-blue-100">Access Token</p>
+                <span className="rounded-full border border-blueTrust/40 bg-blueTrust/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wide text-blue-100">
+                  {tokenStateLabel}
+                </span>
+              </div>
+              <p className="mb-3 rounded-lg border border-slate-500/70 bg-slatebg/50 px-2 py-1.5 font-mono text-xs text-offwhite" aria-label="access token value">
+                {maskToken(accessTokenValue)}
+              </p>
               <ul className="space-y-2 text-sm text-slate-200">
                 <li className="flex justify-between gap-2">
                   <span>Issued at</span>
-                  <span className="font-mono text-slate-300">{activeScenario.fixture.tokens.issuedAt.slice(11, 19)}</span>
+                  <span className="font-mono text-slate-300">{formatIsoTime(activeScenario.fixture.tokens.issuedAt)}</span>
                 </li>
                 <li className="flex justify-between gap-2">
                   <span>Expires at</span>
-                  <span className="font-mono text-amberWarn">{activeScenario.fixture.tokens.expiresAt.slice(11, 19)}</span>
-                </li>
-                <li className="flex justify-between gap-2">
-                  <span>Rotation</span>
-                  <span className="font-mono text-slate-300">#{snapshot?.context.token?.rotation ?? activeScenario.fixture.tokens.rotation}</span>
+                  <span className="font-mono text-amberWarn">{formatIsoTime(effectiveToken?.expiresAt ?? activeScenario.fixture.tokens.expiresAt)}</span>
                 </li>
               </ul>
             </article>
 
             <article className="rounded-xl border border-slate-600/70 bg-slatepanel/60 p-4">
-              <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-400">Cookie Flags</p>
-              <div className="flex flex-wrap gap-2">
-                {activeScenario.fixture.cookies.map((cookie) => (
-                  <span className="chip" key={cookie.name}>
-                    {cookie.name}:{cookie.sameSite}
-                  </span>
-                ))}
-              </div>
+              <p className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-300">Refresh Token</p>
+              <p className="rounded-lg border border-slate-500/70 bg-slatebg/50 px-2 py-1.5 font-mono text-xs text-offwhite" aria-label="refresh token value">
+                {maskToken(refreshTokenValue)}
+              </p>
+            </article>
+
+            <article className="rounded-xl border border-pinkAccent/45 bg-pinkAccent/10 p-4">
+              <p className="mb-3 text-xs uppercase tracking-[0.18em] text-pink-100">Rotation Ledger</p>
+              <ul className="space-y-2 text-sm text-slate-100">
+                <li className="flex justify-between gap-2">
+                  <span>Current rotation</span>
+                  <span className="font-mono">#{tokenRotation}</span>
+                </li>
+                <li className="flex justify-between gap-2">
+                  <span>Refresh success</span>
+                  <span className="font-mono text-emeraldOk">{refreshSuccesses}</span>
+                </li>
+                <li className="flex justify-between gap-2">
+                  <span>Refresh rejected</span>
+                  <span className="font-mono text-roseError">{refreshFailures}</span>
+                </li>
+              </ul>
+            </article>
+
+            <article className="rounded-xl border border-slate-600/70 bg-slatepanel/60 p-4">
+              <p className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-300">Cookie Flags (per step)</p>
+              <ul className="space-y-2" aria-label="cookie flags">
+                {activeScenario.fixture.cookies.map((cookie) => {
+                  const isCleared = cookieClearedSeen
+                  return (
+                    <li key={cookie.name} className="rounded-lg border border-slate-500/65 bg-slatebg/40 p-2">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="font-mono text-xs text-offwhite">{cookie.name}</p>
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide ${
+                            isCleared
+                              ? 'border-roseError/45 bg-roseError/10 text-rose-200'
+                              : 'border-emeraldOk/45 bg-emeraldOk/10 text-emerald-100'
+                          }`}
+                        >
+                          {isCleared ? 'cleared' : 'active'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="chip">SameSite:{cookie.sameSite}</span>
+                        <span className="chip">HttpOnly:{cookie.httpOnly ? 'yes' : 'no'}</span>
+                        <span className="chip">Secure:{cookie.secure ? 'yes' : 'no'}</span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
             </article>
 
             <article className="rounded-xl border border-amberWarn/35 bg-amberWarn/10 p-4">

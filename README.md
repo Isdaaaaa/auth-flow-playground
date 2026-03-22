@@ -2,26 +2,22 @@
 
 Interactive sandbox for rehearsing tricky authentication lifecycle scenarios (expired refresh, clock skew, multi-tab logout) with a debugger-style UI.
 
-## Slice-001 status: scenario catalog + deterministic fixtures
+## Slice-004 status: token + cookie inspector
 
-This slice adds real scenario data plumbing for upcoming timeline/state-machine work:
+This slice upgrades the right-side inspector into a true per-step auth debugger:
 
-- Typed scenario catalog (`src/scenarios/catalog.ts`) with 6 presets:
-  - Expired refresh token
-  - Invalid callback state
-  - Clock skew drift
-  - Multi-tab logout
-  - Stale refresh rotation replay
-  - Server-side session revoke
-- Deterministic fixture bundles per scenario:
-  - user profile
-  - token state (issued/expires/rotation/validity)
-  - cookie flags
-  - ordered event timeline entries
-  - known API error surfaces
-- Mock API layer (`src/scenarios/mockApi.ts`) with deterministic async responses and optional latency profile (`none`, `fast`, `realistic`).
-- Minimal UI wiring so the left scenario list renders from the typed catalog and selecting a scenario updates details in the center/right panels.
-- Test coverage for catalog integrity and deterministic mock API behavior.
+- Per-step token inspection in `src/App.tsx`:
+  - masked access + refresh token values
+  - issued/expiry time visibility
+  - derived token state badge (`active`, `expired`, `revoked`, `pending`)
+- Rotation ledger in the inspector:
+  - current rotation counter
+  - refresh success count
+  - refresh rejection count
+- Cookie flag inspector with event-aware status:
+  - SameSite, HttpOnly, Secure flags
+  - per-step `active`/`cleared` status as timeline events are applied
+- Extended UI tests in `src/App.test.tsx` that validate inspector rendering and step-driven updates.
 
 ## Getting started
 
@@ -50,13 +46,13 @@ Then open the printed local URL (usually `http://localhost:5173`).
 - `npm run format:check` - Prettier check mode
 - `npm run test` - Run deterministic scenario tests via Vitest
 
-## Architecture notes (slice-001)
+## Architecture notes (slice-004)
 
 - `src/scenarios/types.ts`: shared types for scenarios, fixtures, and API responses
 - `src/scenarios/catalog.ts`: scenario presets + fixture datasets
 - `src/scenarios/mockApi.ts`: deterministic mock auth API functions
 - `src/scenarios/*.test.ts`: catalog and API behavior tests
-- `src/App.tsx`: shell now reads from catalog and displays active scenario fixture details
+- `src/App.tsx`: three-panel debugger UI + per-step token/cookie inspector logic
 
 ## Extending scenarios
 

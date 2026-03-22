@@ -14,6 +14,13 @@ const getVisualizerPanel = () => {
   return panel
 }
 
+const getInspectorPanel = () => {
+  const label = screen.getByText(/Token \+ Cookie Snapshot/i)
+  const panel = label.closest('section')
+  if (!panel) throw new Error('Inspector panel not found')
+  return panel
+}
+
 describe('flow visualizer controls', () => {
   it('steps timeline forward and updates progress', async () => {
     render(<App />)
@@ -71,5 +78,40 @@ describe('flow visualizer controls', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Reset' }))
 
     expect(within(panel).getByText(/Step 0 \/ 3/i)).toBeInTheDocument()
+  })
+
+  it('shows access/refresh tokens and cookie flags in inspector', async () => {
+    render(<App />)
+
+    const inspector = getInspectorPanel()
+
+    await waitFor(() => {
+      expect(within(inspector).getByLabelText(/access token value/i)).toBeInTheDocument()
+      expect(within(inspector).getByLabelText(/refresh token value/i)).toBeInTheDocument()
+    })
+
+    expect(within(inspector).getByText(/Cookie Flags \(per step\)/i)).toBeInTheDocument()
+    expect(within(inspector).getByText(/SameSite:Lax/i)).toBeInTheDocument()
+    expect(within(inspector).getByText(/HttpOnly:yes/i)).toBeInTheDocument()
+    expect(within(inspector).getAllByText(/Secure:/i).length).toBeGreaterThan(0)
+  })
+
+  it('updates rotation ledger and cookie status after stepping logout cascade scenario', async () => {
+    render(<App />)
+
+    fireEvent.click(screen.getByRole('button', { name: /Multi-tab logout cascade/i }))
+
+    const panel = getVisualizerPanel()
+    const inspector = getInspectorPanel()
+
+    fireEvent.click(within(panel).getByRole('button', { name: 'Step ▶' }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Step ▶' }))
+
+    await waitFor(() => {
+      expect(within(inspector).getByText(/Refresh success/i)).toBeInTheDocument()
+    })
+
+    expect(within(inspector).getByText(/#3/i)).toBeInTheDocument()
+    expect(within(inspector).getAllByText(/cleared/i).length).toBeGreaterThan(0)
   })
 })
