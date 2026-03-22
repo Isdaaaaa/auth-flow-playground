@@ -26,7 +26,7 @@
   {
     "id": "slice-004",
     "title": "Token & cookie inspector",
-    "status": "in_progress",
+    "status": "done",
     "notes": "Panel showing access/refresh tokens, expiry, rotations, and cookie flags per step."
   },
   {
