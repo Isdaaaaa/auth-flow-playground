@@ -14,7 +14,7 @@
   {
     "id": "slice-002",
     "title": "Auth state machine core",
-    "status": "todo",
+    "status": "in_progress",
     "notes": "Implement XState machines for login, refresh, logout, and error paths with mocked transitions."
   },
   {
